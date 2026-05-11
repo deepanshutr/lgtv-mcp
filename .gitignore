@@ -1,0 +1,18 @@
+# Go
+/lgtv-mcp
+/dist/
+/bin/
+*.test
+*.out
+coverage.txt
+
+# Local
+.env
+.env.local
+secrets.env
+
+# Editor
+.idea/
+.vscode/
+*.swp
+.DS_Store

@@ -88,14 +88,25 @@ func Register(s *server.MCPServer, client *core.Client) {
 	}))
 
 	s.AddTool(mcp.NewTool("tv_launch_app",
-		mcp.WithDescription("Launch an app on the TV by app ID. Use tv_state to see available app IDs."),
+		mcp.WithDescription("Launch an app on the TV by app ID. Use tv_state to see available app IDs. Optionally deep-link into a specific piece of content via `content_id` (e.g. a YouTube video ID like 'dQw4w9WgXcQ') or `content_target` (a deep-link URL such as 'https://www.youtube.com/tv?v=...' for the YouTube app, or any URL for the 'com.webos.app.browser' app)."),
 		mcp.WithString("id", mcp.Required(), mcp.Description("App ID, e.g. 'netflix' or 'youtube.leanback.v4'")),
+		mcp.WithString("content_id", mcp.Description("Optional deep-link content key for the target app (YouTube: video ID; Netflix: title ID)")),
+		mcp.WithString("content_target", mcp.Description("Optional deep-link URL. Sent as params.contentTarget — used by YouTube and the LG browser")),
 	), wrap(func(ctx context.Context, req mcp.CallToolRequest) (string, error) {
 		id, err := req.RequireString("id")
 		if err != nil {
 			return "", err
 		}
-		if err := client.LaunchApp(ctx, id); err != nil {
+		opts := &core.LaunchAppOpts{
+			ContentID: req.GetString("content_id", ""),
+		}
+		if target := req.GetString("content_target", ""); target != "" {
+			opts.Params = map[string]any{"contentTarget": target}
+		}
+		if opts.ContentID == "" && opts.Params == nil {
+			opts = nil
+		}
+		if err := client.LaunchApp(ctx, id, opts); err != nil {
 			return "", err
 		}
 		return "Launched " + id + ".", nil

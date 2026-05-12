@@ -72,8 +72,26 @@ func (c *Client) VolumeDelta(ctx context.Context, delta int) error {
 func (c *Client) Mute(ctx context.Context, on bool) error {
 	return c.do(ctx, "POST", "/mute", map[string]any{"on": on}, nil)
 }
-func (c *Client) LaunchApp(ctx context.Context, id string) error {
-	return c.do(ctx, "POST", "/app/launch", map[string]any{"id": id}, nil)
+// LaunchAppOpts are optional deep-link extras for /app/launch.
+// At most one of ContentID or Params should be set; both are passed
+// through to the daemon, which forwards to aiowebostv's
+// launch_app_with_content_id / launch_app_with_params helpers.
+type LaunchAppOpts struct {
+	ContentID string         // app-specific deep-link key (e.g. YouTube video ID)
+	Params    map[string]any // arbitrary params payload (e.g. {"contentTarget": "..."})
+}
+
+func (c *Client) LaunchApp(ctx context.Context, id string, opts *LaunchAppOpts) error {
+	body := map[string]any{"id": id}
+	if opts != nil {
+		if opts.ContentID != "" {
+			body["content_id"] = opts.ContentID
+		}
+		if opts.Params != nil {
+			body["params"] = opts.Params
+		}
+	}
+	return c.do(ctx, "POST", "/app/launch", body, nil)
 }
 func (c *Client) PressKey(ctx context.Context, name string) error {
 	return c.do(ctx, "POST", "/key", map[string]any{"name": name}, nil)

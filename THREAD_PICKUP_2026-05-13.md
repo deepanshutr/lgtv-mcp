@@ -4,22 +4,22 @@ State of the repo when this session ended.
 
 ## What changed
 
-One commit this session: **`6e2ba3e` Feat: tv_launch_app exposes
-content_id and content_target**.
+Two commits this session:
 
-The `tv_launch_app` tool now takes two optional extras:
-- `content_id` — app-specific deep-link key (YouTube video ID,
-  Netflix title ID, etc.)
-- `content_target` — deep-link URL, wrapped into `{contentTarget: ...}`
-  before being sent to the daemon as `params.contentTarget`. Used by
-  the LG browser and (some firmware versions of) YouTube.
+1. **`6e2ba3e` Feat: tv_launch_app exposes content_id and content_target**
+   — adds optional `content_id` (app-specific deep-link key like a
+   YouTube video ID) and `content_target` (deep-link URL, wrapped into
+   `{contentTarget: ...}` before being sent as `params.contentTarget`).
+2. **`38cb102` Feat: tv_youtube_pair, tv_youtube_play, tv_youtube_status
+   MCP tools** — three new tools wrapping the YouTube Lounge endpoints
+   in lgtv-core (`/youtube/pair`, `/youtube/play`, `/youtube/status`).
+   This is the **reliable** way to deep-link YouTube content on CX
+   firmware; see the lgtv-core thread-pickup for protocol details.
 
-Build verified, schema verified via the stdio smoke test:
-```
-echo '{"jsonrpc":"2.0",…"tools/list"}' | lgtv-mcp
-```
-returns `tv_launch_app` with `content_id` + `content_target` as optional
-string properties.
+Total tool count is now 11. End-to-end stdio smoke test verified:
+initialize → tools/list shows all 11; tools/call on
+`tv_youtube_status` round-trips through the daemon and returns
+`paired=true` with the cached screen_id.
 
 ## What you need to know
 
@@ -37,30 +37,24 @@ session.** New sessions automatically read the upgraded binary.
 This is why the binary install uses `install -m 0755` (handles
 text-file-busy) rather than `cp` (fails when child is running).
 
-### Not yet wired: YouTube Lounge tools
+### YouTube Lounge tools — DONE (`38cb102`)
 
-`lgtv-core` got a major upgrade today: full YouTube Lounge protocol
-support for true deep-link playback on CX-firmware TVs that ignore
-SSAP launch deep-links. See `lgtv-core/THREAD_PICKUP_2026-05-13.md`
-for the protocol details.
+All three tools are now wired and the upgraded binary is installed at
+`~/.local/bin/lgtv-mcp`. Schemas:
 
-The daemon exposes three new endpoints:
-- `POST /youtube/pair {"pairing_code": "..."}`
-- `POST /youtube/play {"video_id": "..."}`
-- `GET /youtube/status`
+- `tv_youtube_play(video_id: string, start_time_s?: number)` — plays
+  the given video. Returns `Playing YouTube video <id>.` on success or
+  surfaces daemon diagnostic on failure.
+- `tv_youtube_pair(pairing_code: string)` — exchanges a 12-digit TV
+  code for a permanent paired loungeToken. Dashes/spaces in the code
+  are stripped daemon-side.
+- `tv_youtube_status()` — returns paired/unpaired + cached IDs.
 
-These should be wrapped as MCP tools `tv_youtube_pair`, `tv_youtube_play`,
-`tv_youtube_status`. **This work is NOT yet done in lgtv-mcp.** Next
-session candidate. The new tools should:
-
-- Take `video_id` (required string) for `tv_youtube_play`, optional
-  `start_time_s` (int, default 0).
-- Take `pairing_code` (required string) for `tv_youtube_pair`. The
-  description should explain where to get the code:
-  *"YouTube on TV → Settings → Link with TV code"*.
-- Surface daemon errors verbatim — if pairing expired, the error from
-  `/youtube/play` is the user-facing diagnostic ("not paired" or
-  "lounge token rejected").
+User already has a paired session as of this commit's verification
+(screenId `5b563a65…`). Re-pairing happens automatically when needed
+— `tv_youtube_play` will return an error like "not paired" or
+"lounge token rejected" that should be surfaced to the user, who then
+calls `tv_youtube_pair` with a fresh code.
 
 ### Adding new core HTTP endpoints to the Go client
 

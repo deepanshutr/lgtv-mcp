@@ -96,3 +96,27 @@ func (c *Client) LaunchApp(ctx context.Context, id string, opts *LaunchAppOpts) 
 func (c *Client) PressKey(ctx context.Context, name string) error {
 	return c.do(ctx, "POST", "/key", map[string]any{"name": name}, nil)
 }
+
+// YoutubePair exchanges a 12-digit TV pairing code (from YouTube on TV →
+// Settings → Link with TV code) for a permanent paired Lounge session.
+// One-time setup; the daemon persists credentials at
+// ~/.config/lgtv/youtube_lounge.json and reuses them for every Play call.
+func (c *Client) YoutubePair(ctx context.Context, pairingCode string) (map[string]any, error) {
+	var out map[string]any
+	return out, c.do(ctx, "POST", "/youtube/pair", map[string]any{"pairing_code": pairingCode}, &out)
+}
+
+// YoutubePlay plays a YouTube video on the paired TV. Requires prior pairing
+// (returns an error like "not paired" otherwise). The video_id is the
+// 11-character YouTube ID (the `v=` query param), e.g. "jNQXAC9IVRw".
+func (c *Client) YoutubePlay(ctx context.Context, videoID string, startTimeS int) error {
+	return c.do(ctx, "POST", "/youtube/play",
+		map[string]any{"video_id": videoID, "start_time_s": startTimeS}, nil)
+}
+
+// YoutubeStatus reports whether the daemon has cached Lounge pairing
+// credentials and what the cached screen/device IDs look like.
+func (c *Client) YoutubeStatus(ctx context.Context) (map[string]any, error) {
+	var out map[string]any
+	return out, c.do(ctx, "GET", "/youtube/status", nil, &out)
+}

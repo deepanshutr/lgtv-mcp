@@ -125,6 +125,49 @@ func Register(s *server.MCPServer, client *core.Client) {
 		}
 		return "Pressed " + name + ".", nil
 	}))
+
+	s.AddTool(mcp.NewTool("tv_youtube_play",
+		mcp.WithDescription("Play a specific YouTube video on the TV using the paired Lounge protocol. Reliable for deep-linking on LG WebOS (especially CX-era firmware where the standard launch surface ignores video IDs). Requires one-time pairing via tv_youtube_pair first; if not paired, returns an error with instructions. Fully autonomous — no profile-picker dance, no key presses needed."),
+		mcp.WithString("video_id", mcp.Required(), mcp.Description("11-character YouTube video ID (the 'v=' query param from a YouTube URL, e.g. 'jNQXAC9IVRw' for 'Me at the zoo')")),
+		mcp.WithNumber("start_time_s", mcp.Description("Optional start offset in seconds (default 0)")),
+	), wrap(func(ctx context.Context, req mcp.CallToolRequest) (string, error) {
+		videoID, err := req.RequireString("video_id")
+		if err != nil {
+			return "", err
+		}
+		startTime := req.GetInt("start_time_s", 0)
+		if err := client.YoutubePlay(ctx, videoID, startTime); err != nil {
+			return "", err
+		}
+		return "Playing YouTube video " + videoID + ".", nil
+	}))
+
+	s.AddTool(mcp.NewTool("tv_youtube_pair",
+		mcp.WithDescription("One-time pair the daemon with the TV's YouTube app via a 12-digit TV code. To get the code: on the TV, open YouTube, press up to reveal the left nav, go to Settings (gear), select 'Link with TV code'. Pass the displayed 12-digit code (dashes/spaces optional) to this tool. The resulting paired loungeToken is stored locally and reused for all future tv_youtube_play calls."),
+		mcp.WithString("pairing_code", mcp.Required(), mcp.Description("The 12-digit code displayed on the TV (dashes and spaces are stripped, so '893-949-732-447' or '893949732447' both work)")),
+	), wrap(func(ctx context.Context, req mcp.CallToolRequest) (string, error) {
+		code, err := req.RequireString("pairing_code")
+		if err != nil {
+			return "", err
+		}
+		out, err := client.YoutubePair(ctx, code)
+		if err != nil {
+			return "", err
+		}
+		b, _ := json.MarshalIndent(out, "", "  ")
+		return "Paired:\n" + string(b), nil
+	}))
+
+	s.AddTool(mcp.NewTool("tv_youtube_status",
+		mcp.WithDescription("Check whether the daemon has cached YouTube Lounge pairing credentials. Returns whether paired plus the cached screen/device IDs. Use this to decide whether tv_youtube_pair needs to run first."),
+	), wrap(func(ctx context.Context, _ mcp.CallToolRequest) (string, error) {
+		out, err := client.YoutubeStatus(ctx)
+		if err != nil {
+			return "", err
+		}
+		b, _ := json.MarshalIndent(out, "", "  ")
+		return string(b), nil
+	}))
 }
 
 // wrap turns a plain (text, error) handler into the mcp-go signature.
